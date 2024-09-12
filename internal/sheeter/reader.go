@@ -16,9 +16,10 @@ type Reader interface {
 }
 
 type reader struct {
-	svc     *sheets.Service
-	flags   cli.Flags
-	rawData [][]interface{}
+	svc           *sheets.Service
+	flags         cli.Flags
+	formattedData [][]interface{}
+	formulaData   [][]interface{}
 }
 
 func NewReader(svc *sheets.Service, flags cli.Flags) Reader {
@@ -32,6 +33,9 @@ func (r *reader) Read() error {
 		if err != nil {
 			return err
 		}
+		// Creates a new range based on the sheet page and range
+		//
+		// e.g. Sheet2!A1:B2 <-- Sheet2 is the title of the sheet
 		for i, sheet := range resp.Sheets {
 			if i == r.flags.SheetPage()-1 {
 				sheetRange = sheet.Properties.Title + "!" + r.flags.SheetRange()
@@ -39,22 +43,28 @@ func (r *reader) Read() error {
 			}
 		}
 	}
-	sheet, err := r.svc.Spreadsheets.Values.Get(r.flags.SheetIDFromURL(), sheetRange).Do()
+	sheetFormatted, err := r.svc.Spreadsheets.Values.Get(r.flags.SheetIDFromURL(), sheetRange).ValueRenderOption("FORMATTED_VALUE").Do()
 	if err != nil {
 		return err
 	}
 
-	r.rawData = sheet.Values
+	sheetFormula, err := r.svc.Spreadsheets.Values.Get(r.flags.SheetIDFromURL(), sheetRange).ValueRenderOption("FORMULA").Do()
+	if err != nil {
+		return err
+	}
+
+	r.formattedData = sheetFormatted.Values
+	r.formulaData = sheetFormula.Values
 
 	return nil
 }
 
 func (r *reader) MarshalJSON() ([]byte, error) {
 	headerIdx := 0
-	if len(r.rawData) == 0 {
+	if len(r.formattedData) == 0 {
 		return nil, nil
 	}
-	headers := r.rawData[headerIdx]
+	headers := r.formattedData[headerIdx]
 	for i, header := range headers {
 		headers[i] = strings.ToLower(header.(string))
 		replaceChars := " -/().%#!@$^&*+=:;,<>?|\\[]{}'\"`~"
@@ -64,11 +74,15 @@ func (r *reader) MarshalJSON() ([]byte, error) {
 	}
 
 	var jsonData []map[string]interface{}
-
-	for _, row := range r.rawData[headerIdx+1:] {
+	formulaData := r.formulaData[headerIdx+1:]
+	for rowIdx, row := range r.formattedData[headerIdx+1:] {
 		rowData := make(map[string]interface{})
 		for i, header := range headers {
 			if i < len(row) {
+				if r.isFormula(formulaData[rowIdx][i]) {
+					rowData[header.(string)+"_formula"] = formulaData[rowIdx][i]
+				}
+
 				if boolVal := r.toBool(row[i]); boolVal != nil {
 					rowData[header.(string)] = boolVal
 				} else {
@@ -80,7 +94,6 @@ func (r *reader) MarshalJSON() ([]byte, error) {
 		}
 		jsonData = append(jsonData, rowData)
 	}
-
 	return json.Marshal(jsonData)
 }
 
@@ -98,4 +111,17 @@ func (r *reader) toBool(v interface{}) *bool {
 	}
 
 	return nil
+}
+
+func (r *reader) isFormula(cell interface{}) bool {
+	if cell == nil {
+		return false
+	}
+	if strCell, ok := cell.(string); ok {
+		if strings.HasPrefix(strCell, "=") {
+			return true
+		}
+	}
+
+	return false
 }
