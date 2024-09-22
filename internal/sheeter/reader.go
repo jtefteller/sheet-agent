@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/wpengine/sheets-agent/internal/cli"
+	"github.com/jtefteller/sheets-agent/internal/cli"
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/protobuf/proto"
 )

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/wpengine/sheets-agent/internal/auth"
-	"github.com/wpengine/sheets-agent/internal/cli"
-	"github.com/wpengine/sheets-agent/internal/sheeter"
+	"github.com/jtefteller/sheets-agent/internal/auth"
+	"github.com/jtefteller/sheets-agent/internal/cli"
+	"github.com/jtefteller/sheets-agent/internal/sheeter"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )

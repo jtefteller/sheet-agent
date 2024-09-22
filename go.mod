@@ -1,4 +1,4 @@
-module github.com/wpengine/sheets-agent
+module github.com/jtefteller/sheets-agent
 
 go 1.22.1
 
